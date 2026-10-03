@@ -1,7 +1,7 @@
 #!/bin/sh
 backend_port="${DSH_MOBILE_BACKEND_PORT:-41237}"
 
-/opt/node/bin/node /opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js \
+/opt/node/bin/node --expose-internals /opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js \
   web --host 127.0.0.1 --port "$backend_port" < /etc/os-release &
 backend_pid=$!
 
