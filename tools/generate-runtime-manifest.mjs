@@ -12,7 +12,7 @@ if (!['all', 'engine', 'image', 'proroot'].includes(component)) {
   throw new Error('Expected --component all, engine, image, or proroot')
 }
 const versions = parseEnv(await readFile(path.join(projectRoot, 'runtime', 'versions.env'), 'utf8'))
-const rootfsFile = 'dsh-ubuntu-arm64.tar.zst'
+const rootfsFile = 'ubuntu-arm64.tar.zst'
 const nativeFiles = [
   ['libdsh_proot.so', 'libdsh_proot.so'],
   ['libdsh_proot_loader.so', 'libdsh_proot_loader.so'],
@@ -63,18 +63,14 @@ const manifest = {
     prorootBridgeLibrary: 'libproroot-bridge.so',
     prorootLinkerLibrary: 'libproroot-linker.so',
     prorootStubLoaderLibrary: 'libproroot-stub-loader.so',
-    guestCommand: '/usr/local/bin/dsh-mobile-gateway',
+    guestCommand: '/bin/bash',
   },
   sources: {
     ubuntuImage: required(versions, 'UBUNTU_IMAGE'),
-    nodeVersion: required(versions, 'NODE_VERSION'),
-    nodeDistributionSha256: required(versions, 'NODE_LINUX_ARM64_GZIP_SHA256'),
-    dshVersion: required(versions, 'DSH_VERSION'),
-    dshPackageIntegrity: required(versions, 'DSH_PACKAGE_INTEGRITY'),
-    termuxProotVersion: required(versions, 'TERMUX_PROOT_VERSION'),
-    termuxProotCommit: required(versions, 'TERMUX_PROOT_COMMIT'),
-    termuxPackagesCommit: required(versions, 'TERMUX_PACKAGES_COMMIT'),
-    prorootVersion: required(versions, 'PROROOT_VERSION'),
+    termuxProotVersion: versions.TERMUX_PROOT_VERSION ?? '',
+    termuxProotCommit: versions.TERMUX_PROOT_COMMIT ?? '',
+    termuxPackagesCommit: versions.TERMUX_PACKAGES_COMMIT ?? '',
+    prorootVersion: versions.PROROOT_VERSION ?? '',
   },
 }
 

@@ -1,7 +1,8 @@
 # android-ubuntu-image
 
 Android asset library containing a versioned Ubuntu 24.04 ARM64 root filesystem.
-The current image includes Node.js, DSH and its authenticated local gateway.
+It contains standard Linux tools including bash, Python, git and curl. Node.js,
+DSH and application gateways are supplied by the consuming app separately.
 It is built and published independently of the execution library and DSH app.
 
 Maven artifact: `io.github.meteor149:ubuntu-image`.
@@ -18,7 +19,7 @@ Build artifacts from source under Linux/WSL2 with Docker available:
 ./gradlew assembleRelease
 ```
 
-The Docker image recipe and gateway sources are in `runtime/rootfs`.
+The Docker image recipe is in `runtime/rootfs`.
 `runtime/versions.env` pins this repository's input versions. Build outputs are
 stored in ignored `runtime/dist`. Generated binaries are intentionally not committed.
 A diagnostic AAR can be built without artifacts, but cannot be published.

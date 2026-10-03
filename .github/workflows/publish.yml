@@ -52,7 +52,6 @@ jobs:
       - name: Verify and stage release artifacts
         run: |
           node --test tools/generate-runtime-manifest.test.mjs
-          node --test runtime/rootfs/gateway.test.mjs
           ./gradlew validatePublicationArtifacts --no-configuration-cache
       - name: Validate publishing secrets
         env:

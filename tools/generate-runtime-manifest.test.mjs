@@ -27,7 +27,7 @@ test('engine manifest needs neither image nor restricted proroot binaries', asyn
 test('image manifest needs no native runtime files', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'ubuntu-image-'))
   try {
-    await writeFile(path.join(dir, 'dsh-ubuntu-arm64.tar.zst'), 'fixture rootfs')
+    await writeFile(path.join(dir, 'ubuntu-arm64.tar.zst'), 'fixture rootfs')
     execFileSync(process.execPath, [generator, dir, '--component', 'image'])
     const manifest = JSON.parse(await readFile(path.join(dir, 'runtime-manifest.json'), 'utf8'))
     assert.deepEqual(manifest.nativeLibraries, [])
