@@ -3,7 +3,7 @@ import com.vanniktech.maven.publish.MavenPublishBaseExtension
 plugins {
     id("com.android.library") version "8.10.0"
     `maven-publish`
-    id("com.vanniktech.maven.publish.base") version "0.34.0"
+    id("com.vanniktech.maven.publish.base") version "0.35.0"
 }
 
 group = providers.gradleProperty("UBUNTU_MAVEN_GROUP").get()
@@ -11,7 +11,7 @@ version = providers.gradleProperty("UBUNTU_IMAGE_VERSION").get()
 // Central publishing is opt-in so local builds do not require credentials or signing keys.
 if (providers.gradleProperty("MAVEN_CENTRAL_PUBLISH").getOrElse("false").toBoolean()) {
     configure<MavenPublishBaseExtension> {
-        publishToMavenCentral()
+        publishToMavenCentral(automaticRelease = true, validateDeployment = true)
         signAllPublications()
         coordinates(project.group.toString(), providers.gradleProperty("UBUNTU_ARTIFACT_ID").get(), project.version.toString())
     }
