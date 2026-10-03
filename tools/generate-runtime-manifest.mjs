@@ -2,102 +2,31 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import process from 'node:process'
 
-const projectRoot = path.resolve(import.meta.dirname, '..')
-const dist = path.resolve(process.argv[2] ?? path.join(projectRoot, 'runtime', 'dist'))
-const componentIndex = process.argv.indexOf('--component')
-const component = componentIndex < 0 ? 'image' : process.argv[componentIndex + 1]
-if (!['all', 'engine', 'image', 'proroot'].includes(component)) {
-  throw new Error('Expected --component all, engine, image, or proroot')
+if (process.argv.length > 3) throw new Error('Only an artifact directory can be supplied')
+const root = path.resolve(import.meta.dirname, '..')
+const dist = path.resolve(process.argv[2] ?? path.join(root, 'runtime/dist'))
+const versions = Object.fromEntries((await readFile(path.join(root, 'runtime/versions.env'), 'utf8'))
+  .split(/\r?\n/u).map(line => line.trim()).filter(line => line && !line.startsWith('#'))
+  .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]))
+for (const name of ['UBUNTU_IMAGE', 'IMAGE_VERSION']) {
+  if (!versions[name]) throw new Error(`Missing ${name} in runtime/versions.env`)
 }
-const versions = parseEnv(await readFile(path.join(projectRoot, 'runtime', 'versions.env'), 'utf8'))
-const rootfsFile = 'ubuntu-arm64.tar.zst'
-const nativeFiles = [
-  ['libdsh_proot.so', 'libdsh_proot.so'],
-  ['libdsh_proot_loader.so', 'libdsh_proot_loader.so'],
-  ['libandroid-shmem.so', 'libandroid-shmem.so'],
-  ['libdsh_talloc.so', 'libdsh_talloc.so'],
-  ['libproroot.so', 'libproroot.so', 'PROROOT_LAUNCHER_SHA256'],
-  ['libproroot-runtime.so', 'libproroot-runtime.so', 'PROROOT_RUNTIME_SHA256'],
-  ['libproroot-bridge.so', 'libproroot-bridge.so', 'PROROOT_BRIDGE_SHA256'],
-  ['libproroot-linker.so', 'libproroot-linker.so', 'PROROOT_LINKER_SHA256'],
-  ['libproroot-stub-loader.so', 'libproroot-stub-loader.so', 'PROROOT_STUB_LOADER_SHA256'],
-]
-
-const rootfsPath = path.join(dist, rootfsFile)
-const rootfsStat = ['all', 'image'].includes(component) ? await stat(rootfsPath) : null
-const nativeLibraries = []
-for (const [file, packagedName, pinnedShaName] of nativeFiles) {
-  const isProroot = file.startsWith('libproroot')
-  if (component === 'image' || (component === 'engine' && isProroot) || (component === 'proroot' && !isProroot)) continue
-  const artifactPath = path.join(dist, file)
-  await stat(artifactPath)
-  const actualSha256 = await sha256(artifactPath)
-  if (pinnedShaName) {
-    const expectedSha256 = required(versions, pinnedShaName).toLowerCase()
-    if (actualSha256 !== expectedSha256) {
-      throw new Error(`${file} checksum mismatch: expected=${expectedSha256} actual=${actualSha256}`)
-    }
-  }
-  nativeLibraries.push({ file, packagedName, sha256: actualSha256 })
-}
-
+const file = 'ubuntu-arm64.tar.zst'
+const archive = path.join(dist, file)
+const compressedBytes = (await stat(archive)).size
+if (compressedBytes === 0) throw new Error('The image archive is empty')
+const hash = createHash('sha256')
+for await (const chunk of createReadStream(archive)) hash.update(chunk)
 const manifest = {
-  schemaVersion: 2,
+  schemaVersion: 1,
   available: true,
-  runtimeVersion: required(versions, 'RUNTIME_VERSION'),
-  abi: 'arm64-v8a',
-  rootfs: rootfsStat ? {
-    file: rootfsFile,
-    sha256: await sha256(rootfsPath),
-    compressedBytes: rootfsStat.size,
-    minimumFreeBytes: Math.max(2_147_483_648, rootfsStat.size * 5),
-  } : undefined,
-  nativeLibraries,
-  entrypoint: {
-    prootLibrary: 'libdsh_proot.so',
-    loaderLibrary: 'libdsh_proot_loader.so',
-    prorootLibrary: 'libproroot.so',
-    prorootRuntimeLibrary: 'libproroot-runtime.so',
-    prorootBridgeLibrary: 'libproroot-bridge.so',
-    prorootLinkerLibrary: 'libproroot-linker.so',
-    prorootStubLoaderLibrary: 'libproroot-stub-loader.so',
-    guestCommand: '/bin/bash',
-  },
-  sources: {
-    ubuntuImage: required(versions, 'UBUNTU_IMAGE'),
-    termuxProotVersion: versions.TERMUX_PROOT_VERSION ?? '',
-    termuxProotCommit: versions.TERMUX_PROOT_COMMIT ?? '',
-    termuxPackagesCommit: versions.TERMUX_PACKAGES_COMMIT ?? '',
-    prorootVersion: versions.PROROOT_VERSION ?? '',
-  },
+  imageVersion: versions.IMAGE_VERSION,
+  architecture: 'arm64',
+  archive: { file, sha256: hash.digest('hex'), compressedBytes,
+    minimumFreeBytes: Math.max(2_147_483_648, compressedBytes * 5) },
+  source: { ubuntuImage: versions.UBUNTU_IMAGE },
 }
-
-await writeFile(path.join(dist, 'runtime-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
-process.stdout.write(`runtime manifest: ${path.join(dist, 'runtime-manifest.json')}\n`)
-
-async function sha256(file) {
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(file)) hash.update(chunk)
-  return hash.digest('hex')
-}
-
-function parseEnv(text) {
-  return Object.fromEntries(
-    text.split(/\r?\n/u)
-      .map(line => line.trim())
-      .filter(line => line !== '' && !line.startsWith('#'))
-      .map(line => {
-        const separator = line.indexOf('=')
-        if (separator <= 0) throw new Error(`Invalid versions.env line: ${line}`)
-        return [line.slice(0, separator), line.slice(separator + 1)]
-      }),
-  )
-}
-
-function required(values, name) {
-  const value = values[name]
-  if (typeof value !== 'string' || value === '') throw new Error(`Missing ${name} in runtime/versions.env`)
-  return value
-}
+const destination = path.join(dist, 'image-manifest.json')
+await writeFile(destination, JSON.stringify(manifest, null, 2) + '\n')
+process.stdout.write(`image manifest: ${destination}\n`)

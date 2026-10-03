@@ -17,14 +17,13 @@ if (providers.gradleProperty("MAVEN_CENTRAL_PUBLISH").getOrElse("false").toBoole
     }
 }
 
-extra["runtimeArtifactKind"] = "image"
 apply(from = rootProject.file("gradle/runtime-artifacts.gradle.kts"))
 
 android {
     namespace = "ai.meteor.ubuntu.image"
     compileSdk = 36
     defaultConfig { minSdk = 28 }
-    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/runtime/assets"))
+    sourceSets["main"].assets.srcDir(layout.buildDirectory.dir("generated/image/assets"))
     androidResources.noCompress += "zst"
     publishing.singleVariant("release") { withSourcesJar() }
 }
@@ -33,7 +32,7 @@ apply(from = rootProject.file("gradle/publish-ubuntu.gradle.kts"))
 
 tasks.register<Exec>("buildRuntime") {
     group = "runtime"
-    description = "Builds this repository's runtime artifacts and manifest."
+    description = "Builds the Ubuntu image archive and descriptor."
     workingDir(rootDir)
     if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
         commandLine("pwsh", "-NoProfile", "-File", "runtime/build-runtime.ps1")

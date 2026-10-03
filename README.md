@@ -1,38 +1,38 @@
 # android-ubuntu-image
 
 Android asset library containing a versioned Ubuntu 24.04 ARM64 root filesystem.
-It contains standard Linux tools including bash, Python, git and curl. Node.js,
-DSH and application gateways are supplied by the consuming app separately.
-It is built and published independently of the execution library and DSH app.
+The image includes bash, Python, git, curl, an SSH client and ripgrep. It can be
+used by any host capable of installing and running a Linux ARM64 filesystem.
 
-Maven artifact: `io.github.meteor149:ubuntu-image`.
-Repository name and Maven artifact name intentionally differ to preserve existing dependencies.
+Maven coordinate: `io.github.meteor149:ubuntu-image:24.04-1`.
 
 ## Build
 
-Use JDK 21, Android SDK 36, Node.js 24, and Android API 28+ / ARM64 for consumers.
-The wrapper uses a Java 17 toolchain for Kotlin/Java compilation, matching the host project.
-Build artifacts from source under Linux/WSL2 with Docker available:
+Building the AAR requires JDK 21 and Android SDK 36. Building the image additionally
+requires Docker BuildKit with ARM64 emulation and Node.js 24 for descriptor tooling.
+Node.js is a build-machine requirement for metadata generation.
 
 ```bash
 ./gradlew buildRuntime
+node --test tools/generate-runtime-manifest.test.mjs
 ./gradlew assembleRelease
 ```
 
-The Docker image recipe is in `runtime/rootfs`.
-`runtime/versions.env` pins this repository's input versions. Build outputs are
-stored in ignored `runtime/dist`. Generated binaries are intentionally not committed.
-A diagnostic AAR can be built without artifacts, but cannot be published.
+The image recipe lives in `runtime/rootfs/Containerfile`, with its Ubuntu source
+and image version in `runtime/versions.env`. Windows uses the PowerShell scripts;
+Linux uses the Bash scripts. Archives and descriptors are generated into ignored
+`runtime/dist` and are not committed. Existing artifacts can be supplied with
+`-PUBUNTU_IMAGE_DIST=/absolute/artifact/path`.
 
-```bash
-node tools/generate-runtime-manifest.mjs runtime/dist
-node --test tools/generate-runtime-manifest.test.mjs
-```
+The AAR contains only `assets/runtime/ubuntu-arm64.tar.zst` and
+`assets/runtime/ubuntu-image-manifest.json`. The descriptor records the archive's
+SHA-256, compressed size, minimum free space, Linux architecture, image version
+and Ubuntu source. No host code, Android permissions or native launcher is bundled.
+A diagnostic AAR can be built with an unavailable descriptor, but cannot be published.
 
-The generator defaults to this repository's component only. An existing manifest
-and artifacts can also be supplied with `-PUBUNTU_IMAGE_DIST=/absolute/artifact/path`.
+## Publication
 
-## Publish
+Versions and Maven coordinates are configured in `gradle.properties`.
 
 ```bash
 ./gradlew publish                 # build/maven-repository
@@ -40,34 +40,30 @@ and artifacts can also be supplied with `-PUBUNTU_IMAGE_DIST=/absolute/artifact/
 ./gradlew publish -PUBUNTU_MAVEN_URL=https://your-repository.example/releases
 ```
 
-Version/group/artifact properties are in `gradle.properties`. Remote credentials
-use `UBUNTU_MAVEN_USERNAME` and `UBUNTU_MAVEN_PASSWORD` environment variables.
-Release AAR, sources JAR, POM and Gradle metadata are published. Maven Central publishing uses the configured GitHub Actions secrets.
-The build workflow builds real artifacts and uploads a local Maven repository.
-The `Publish to Maven Central` workflow runs on a published GitHub Release or
-manual dispatch. Release tags must match `v<version>` in `gradle.properties`.
-It uses the same secrets as `meteor149/cordis-kotlin`: `MAVEN_CENTRAL_USERNAME`,
-`MAVEN_CENTRAL_PASSWORD`, `SIGNING_KEY_ID`, `SIGNING_PASSWORD`, `GPG_KEY_CONTENT`.
-Signing is done in memory; no private key file is stored in the repository.
-The workflow uploads a signed deployment; complete publication in Central Portal
-as with cordis-kotlin. First source push does not trigger Central publication.
+Remote repositories use `UBUNTU_MAVEN_USERNAME` and `UBUNTU_MAVEN_PASSWORD`.
+The publication includes an AAR, sources, documentation, POM and Gradle metadata.
+Publishing refuses unavailable or checksum-invalid artifacts.
 
-To invoke the upload task directly, provide the corresponding
-`ORG_GRADLE_PROJECT_mavenCentral*` / `ORG_GRADLE_PROJECT_signingInMemory*`
-environment variables and run:
+The Maven Central workflow runs on manual dispatch or a published GitHub Release.
+Release tags must match `v<version>`. It uses `MAVEN_CENTRAL_USERNAME`,
+`MAVEN_CENTRAL_PASSWORD`, `SIGNING_KEY_ID`, `SIGNING_PASSWORD` and `GPG_KEY_CONTENT`.
+Keys are loaded in memory. The workflow uploads, validates and releases a signed
+Central deployment; ordinary source pushes only run the build workflow.
+
+For direct Central publication, provide the corresponding
+`ORG_GRADLE_PROJECT_mavenCentral*` and `ORG_GRADLE_PROJECT_signingInMemory*`
+environment variables, then run:
 
 ```bash
-./gradlew publishToMavenCentral -PMAVEN_CENTRAL_PUBLISH=true --no-configuration-cache
+./gradlew publishAndReleaseToMavenCentral -PMAVEN_CENTRAL_PUBLISH=true --no-configuration-cache
 ```
-
-The release publication includes the AAR, sources, a documentation JAR, POM,
-and Gradle metadata. All publishing tasks first validate the real runtime artifacts.
 
 ## Integration
 
-See [host configuration and API examples](docs/integration.md).
+See [asset layout and image contract](docs/integration.md). The image has no Maven
+dependencies. The consuming app owns installation, execution and persistent data.
 
 ## License
 
-Host source code is under [Apache License 2.0](LICENSE). Bundled native programs,
-Ubuntu packages and image dependencies retain their upstream licenses.
+Build and packaging sources use [Apache License 2.0](LICENSE). Ubuntu packages
+retain their upstream licenses, including the notices inside the image.

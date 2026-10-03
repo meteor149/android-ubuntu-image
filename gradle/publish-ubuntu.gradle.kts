@@ -31,9 +31,7 @@ configure<PublishingExtension> {
             pom {
                 name.set(project.name)
                 inceptionYear.set("2026")
-                description.set(if (project.name == "android-ubuntu-runtime")
-                    "Android Ubuntu installation and PRoot/chroot execution library"
-                else "Versioned general-purpose Ubuntu ARM64 root filesystem")
+                description.set("Versioned general-purpose Ubuntu ARM64 root filesystem")
                 url.set("https://github.com/meteor149/android-ubuntu-image")
                 licenses {
                     license {
